@@ -90,7 +90,7 @@ pip install -r requirements.txt
 
 \# 4️⃣ Run the Scraper
 
-python main.py
+python site1.py
 
 
 
