@@ -135,12 +135,20 @@ def html_to_markdown(content_div: BeautifulSoup) -> str:
             if text:
                 md.append(f"`{text}`")
 
-        # ---------------- LINKS ----------------
+        # ---------------- LINKS (SAFE) ----------------
         elif el.name == "a":
             href = el.get("href")
             text = el.get_text(strip=True)
-            if href and text:
-                md.append(f"[{text}]({urljoin(BASE_URL, href)})")
+
+            if not href or not text:
+                continue
+
+            try:
+                full_url = urljoin(BASE_URL, href)
+                md.append(f"[{text}]({full_url})")
+            except ValueError:
+                # Handles invalid IPv6, javascript:, mailto:, malformed hrefs
+                md.append(text)
 
     return "\n".join(md).strip()
 
@@ -153,6 +161,14 @@ def scrape_article(article_url: str):
     """
     Scrape a single GreenMedInfo article and save as Markdown.
     """
+    slug = slug_from_url(article_url)
+    file_path = os.path.join(OUTPUT_FOLDER, f"{slug}.md")
+
+    # ✅ Skip if article already exists
+    if os.path.exists(file_path):
+        print(f"   ⏭️ Skipped (already exists) → {slug}.md")
+        return
+
     print(f"   🔍 Article → {article_url}")
 
     response = fetch_url(article_url)
@@ -169,9 +185,6 @@ def scrape_article(article_url: str):
         return
 
     title = title_tag.get_text(strip=True)
-    slug = slug_from_url(article_url)
-    file_path = os.path.join(OUTPUT_FOLDER, f"{slug}.md")
-
     body_md = html_to_markdown(content_div)
 
     # Skip member-only / empty pages
@@ -235,9 +248,7 @@ def scrape_all_pages():
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # ✅ Correct selector based on provided DOM
         article_links = soup.select("div.views-field-title a")
-
         print(f"   🔗 Articles found: {len(article_links)}")
 
         for a in article_links:
